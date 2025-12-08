@@ -1,8 +1,21 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plane } from "lucide-react";
+import { Plane, LogOut, User } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Header = () => {
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -25,11 +38,46 @@ const Header = () => {
           </a>
         </nav>
 
-        <Link to="/search">
-          <Button variant="default" size="default">
-            Find My Flight
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          {user ? (
+            <>
+              <Link to="/search">
+                <Button variant="default" size="default">
+                  Find My Flight
+                </Button>
+              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="rounded-full">
+                    <User className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem className="text-muted-foreground text-sm">
+                    {user.email}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut} className="text-destructive cursor-pointer">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+            <>
+              <Link to="/auth">
+                <Button variant="ghost" size="default">
+                  Sign In
+                </Button>
+              </Link>
+              <Link to="/search">
+                <Button variant="default" size="default">
+                  Find My Flight
+                </Button>
+              </Link>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
