@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -10,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Plane, ArrowLeft, CalendarIcon, Search as SearchIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import FlightCard from "@/components/FlightCard";
+import AirportSearch from "@/components/AirportSearch";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -66,12 +66,8 @@ const SearchPage = () => {
       return;
     }
 
-    // Validate that origin and destination look like airport codes (3 letters)
-    const originCode = origin.toUpperCase().trim();
-    const destCode = destination.toUpperCase().trim();
-
-    if (originCode.length < 3 || destCode.length < 3) {
-      toast.error("Please enter valid airport codes (e.g., JFK, LHR)");
+    if (origin.length !== 3 || destination.length !== 3) {
+      toast.error("Please select valid airport codes");
       return;
     }
 
@@ -82,8 +78,8 @@ const SearchPage = () => {
     try {
       const { data, error } = await supabase.functions.invoke('search-flights', {
         body: {
-          origin: originCode.substring(0, 3),
-          destination: destCode.substring(0, 3),
+          origin: origin.toUpperCase(),
+          destination: destination.toUpperCase(),
           departureDate: format(departDate, 'yyyy-MM-dd'),
           returnDate: isRoundTrip && returnDate ? format(returnDate, 'yyyy-MM-dd') : undefined,
           travelClass: flightClass,
@@ -120,7 +116,7 @@ const SearchPage = () => {
     }
   };
 
-  const isFormValid = origin && destination && departDate && (isRoundTrip ? returnDate : true);
+  const isFormValid = origin.length === 3 && destination.length === 3 && departDate && (isRoundTrip ? returnDate : true);
 
   return (
     <div className="min-h-screen bg-background">
@@ -165,27 +161,23 @@ const SearchPage = () => {
             <div className="grid md:grid-cols-2 gap-6 mb-6">
               {/* Origin */}
               <div className="space-y-2">
-                <Label htmlFor="origin">From (Airport Code)</Label>
-                <Input
+                <Label htmlFor="origin">From</Label>
+                <AirportSearch
                   id="origin"
-                  placeholder="e.g., JFK, LAX, LHR"
                   value={origin}
-                  onChange={(e) => setOrigin(e.target.value.toUpperCase())}
-                  className="bg-secondary/50 border-border uppercase"
-                  maxLength={3}
+                  onChange={setOrigin}
+                  placeholder="Search city or airport code..."
                 />
               </div>
 
               {/* Destination */}
               <div className="space-y-2">
-                <Label htmlFor="destination">To (Airport Code)</Label>
-                <Input
+                <Label htmlFor="destination">To</Label>
+                <AirportSearch
                   id="destination"
-                  placeholder="e.g., CDG, SFO, NRT"
                   value={destination}
-                  onChange={(e) => setDestination(e.target.value.toUpperCase())}
-                  className="bg-secondary/50 border-border uppercase"
-                  maxLength={3}
+                  onChange={setDestination}
+                  placeholder="Search city or airport code..."
                 />
               </div>
             </div>
