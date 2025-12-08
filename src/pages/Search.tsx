@@ -11,19 +11,8 @@ import { Plane, ArrowLeft, CalendarIcon, Search as SearchIcon, Loader2 } from "l
 import { format } from "date-fns";
 import FlightCard from "@/components/FlightCard";
 import { cn } from "@/lib/utils";
-
-const airlines = [
-  { value: "any", label: "Any Airline" },
-  { value: "united", label: "United Airlines" },
-  { value: "delta", label: "Delta Airlines" },
-  { value: "american", label: "American Airlines" },
-  { value: "southwest", label: "Southwest Airlines" },
-  { value: "jetblue", label: "JetBlue" },
-  { value: "british", label: "British Airways" },
-  { value: "lufthansa", label: "Lufthansa" },
-  { value: "emirates", label: "Emirates" },
-  { value: "singapore", label: "Singapore Airlines" },
-];
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const currencies = [
   { value: "USD", label: "USD ($)" },
@@ -41,95 +30,94 @@ const flightClasses = [
   { value: "first", label: "First Class" },
 ];
 
-// Mock flight data
-const mockFlights = [
-  {
-    airline: "Emirates",
-    airlineLogo: "",
-    departureTime: "08:30",
-    arrivalTime: "14:45",
-    departureCity: "JFK",
-    arrivalCity: "LHR",
-    duration: "6h 15m",
-    stops: 0,
-    price: 487,
-    flightClass: "economy",
-  },
-  {
-    airline: "British Airways",
-    airlineLogo: "",
-    departureTime: "10:15",
-    arrivalTime: "16:30",
-    departureCity: "JFK",
-    arrivalCity: "LHR",
-    duration: "6h 15m",
-    stops: 0,
-    price: 524,
-    flightClass: "economy",
-  },
-  {
-    airline: "Delta",
-    airlineLogo: "",
-    departureTime: "14:00",
-    arrivalTime: "22:45",
-    departureCity: "JFK",
-    arrivalCity: "LHR",
-    duration: "8h 45m",
-    stops: 1,
-    price: 392,
-    flightClass: "economy",
-  },
-  {
-    airline: "United Airlines",
-    airlineLogo: "",
-    departureTime: "18:30",
-    arrivalTime: "06:45",
-    departureCity: "JFK",
-    arrivalCity: "LHR",
-    duration: "7h 15m",
-    stops: 0,
-    price: 445,
-    flightClass: "economy",
-  },
-  {
-    airline: "Lufthansa",
-    airlineLogo: "",
-    departureTime: "21:00",
-    arrivalTime: "11:30",
-    departureCity: "JFK",
-    arrivalCity: "LHR",
-    duration: "9h 30m",
-    stops: 1,
-    price: 356,
-    flightClass: "economy",
-  },
-];
+interface Flight {
+  id: string;
+  airline: string;
+  airlineCode: string;
+  departureTime: string;
+  arrivalTime: string;
+  departureCity: string;
+  arrivalCity: string;
+  departureDate: string;
+  arrivalDate: string;
+  duration: string;
+  stops: number;
+  price: number;
+  currency: string;
+  flightClass: string;
+  numberOfBookableSeats?: number;
+}
 
 const SearchPage = () => {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [departDate, setDepartDate] = useState<Date>();
   const [returnDate, setReturnDate] = useState<Date>();
-  const [airline, setAirline] = useState("any");
   const [currency, setCurrency] = useState("USD");
   const [flightClass, setFlightClass] = useState("economy");
   const [isRoundTrip, setIsRoundTrip] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
-  const [flights, setFlights] = useState<typeof mockFlights>([]);
+  const [flights, setFlights] = useState<Flight[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
   const handleSearch = async () => {
+    if (!origin || !destination || !departDate) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    // Validate that origin and destination look like airport codes (3 letters)
+    const originCode = origin.toUpperCase().trim();
+    const destCode = destination.toUpperCase().trim();
+
+    if (originCode.length < 3 || destCode.length < 3) {
+      toast.error("Please enter valid airport codes (e.g., JFK, LHR)");
+      return;
+    }
+
     setIsSearching(true);
     setFlights([]);
-    
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    
-    // Return mock results sorted by price
-    const sortedFlights = [...mockFlights].sort((a, b) => a.price - b.price);
-    setFlights(sortedFlights);
-    setIsSearching(false);
     setHasSearched(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('search-flights', {
+        body: {
+          origin: originCode.substring(0, 3),
+          destination: destCode.substring(0, 3),
+          departureDate: format(departDate, 'yyyy-MM-dd'),
+          returnDate: isRoundTrip && returnDate ? format(returnDate, 'yyyy-MM-dd') : undefined,
+          travelClass: flightClass,
+          currency: currency,
+          adults: 1,
+        },
+      });
+
+      if (error) {
+        console.error('Search error:', error);
+        toast.error("Failed to search flights. Please try again.");
+        return;
+      }
+
+      if (data.error) {
+        console.error('API error:', data.error);
+        toast.error(data.error);
+        return;
+      }
+
+      const sortedFlights = [...(data.flights || [])].sort((a: Flight, b: Flight) => a.price - b.price);
+      setFlights(sortedFlights);
+
+      if (sortedFlights.length === 0) {
+        toast.info("No flights found for this route and date");
+      } else {
+        toast.success(`Found ${sortedFlights.length} flights`);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const isFormValid = origin && destination && departDate && (isRoundTrip ? returnDate : true);
@@ -177,25 +165,27 @@ const SearchPage = () => {
             <div className="grid md:grid-cols-2 gap-6 mb-6">
               {/* Origin */}
               <div className="space-y-2">
-                <Label htmlFor="origin">From</Label>
+                <Label htmlFor="origin">From (Airport Code)</Label>
                 <Input
                   id="origin"
-                  placeholder="City or Airport (e.g., New York, JFK)"
+                  placeholder="e.g., JFK, LAX, LHR"
                   value={origin}
-                  onChange={(e) => setOrigin(e.target.value)}
-                  className="bg-secondary/50 border-border"
+                  onChange={(e) => setOrigin(e.target.value.toUpperCase())}
+                  className="bg-secondary/50 border-border uppercase"
+                  maxLength={3}
                 />
               </div>
 
               {/* Destination */}
               <div className="space-y-2">
-                <Label htmlFor="destination">To</Label>
+                <Label htmlFor="destination">To (Airport Code)</Label>
                 <Input
                   id="destination"
-                  placeholder="City or Airport (e.g., London, LHR)"
+                  placeholder="e.g., CDG, SFO, NRT"
                   value={destination}
-                  onChange={(e) => setDestination(e.target.value)}
-                  className="bg-secondary/50 border-border"
+                  onChange={(e) => setDestination(e.target.value.toUpperCase())}
+                  className="bg-secondary/50 border-border uppercase"
+                  maxLength={3}
                 />
               </div>
             </div>
@@ -259,24 +249,7 @@ const SearchPage = () => {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
-              {/* Preferred Airline */}
-              <div className="space-y-2">
-                <Label>Preferred Airline</Label>
-                <Select value={airline} onValueChange={setAirline}>
-                  <SelectTrigger className="bg-secondary/50 border-border">
-                    <SelectValue placeholder="Select airline" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {airlines.map((a) => (
-                      <SelectItem key={a.value} value={a.value}>
-                        {a.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
               {/* Currency */}
               <div className="space-y-2">
                 <Label>Currency</Label>
@@ -339,12 +312,14 @@ const SearchPage = () => {
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">
-                {flights.length > 0 ? (
+                {isSearching ? (
+                  "Searching..."
+                ) : flights.length > 0 ? (
                   <>
                     <span className="text-gradient">{flights.length}</span> flights found
                   </>
                 ) : (
-                  "Searching..."
+                  "No flights found"
                 )}
               </h2>
               {flights.length > 0 && (
@@ -355,10 +330,19 @@ const SearchPage = () => {
             </div>
 
             <div className="space-y-4">
-              {flights.map((flight, index) => (
+              {flights.map((flight) => (
                 <FlightCard
-                  key={index}
-                  {...flight}
+                  key={flight.id}
+                  airline={flight.airline}
+                  airlineLogo=""
+                  departureTime={flight.departureTime}
+                  arrivalTime={flight.arrivalTime}
+                  departureCity={flight.departureCity}
+                  arrivalCity={flight.arrivalCity}
+                  duration={flight.duration}
+                  stops={flight.stops}
+                  price={flight.price}
+                  flightClass={flight.flightClass}
                   currency={currency}
                 />
               ))}
