@@ -6,16 +6,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plane, Mail, Lock, User } from 'lucide-react';
+import { Plane, Mail, Lock, User, Github } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { Separator } from '@/components/ui/separator';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { user, signIn, signUp, loading } = useAuth();
+  const { user, signIn, signUp, signInWithGitHub, loading } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Login form
@@ -163,6 +164,23 @@ const Auth = () => {
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? 'Signing in...' : 'Sign In'}
                 </Button>
+                
+                <div className="relative my-4">
+                  <Separator />
+                  <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+                    or continue with
+                  </span>
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => signInWithGitHub()}
+                >
+                  <Github className="h-4 w-4 mr-2" />
+                  GitHub
+                </Button>
               </form>
             </TabsContent>
             
@@ -217,6 +235,23 @@ const Auth = () => {
                 
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? 'Creating account...' : 'Create Account'}
+                </Button>
+                
+                <div className="relative my-4">
+                  <Separator />
+                  <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+                    or continue with
+                  </span>
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => signInWithGitHub()}
+                >
+                  <Github className="h-4 w-4 mr-2" />
+                  GitHub
                 </Button>
               </form>
             </TabsContent>
